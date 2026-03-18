@@ -10,6 +10,7 @@ import {
   isRunSorted,
   createRunsFromSplits,
 } from '@/lib/timsort-engine';
+import { useTouchDrag } from '@/lib/useTouchDrag';
 import NumberCardComponent from './NumberCardComponent';
 
 /*
@@ -434,13 +435,11 @@ export default function TimSortGame() {
     return RUN_COLORS[g % RUN_COLORS.length];
   };
 
-  // --- Phase 2 ---
-  const handleInsertionTap = (runIdx: number, cardIdx: number) => {
-    if (runIdx !== currentRunIndex || runs[runIdx].sorted) return;
-    if (selectedCardIdx === null) { setSelectedCardIdx(cardIdx); return; }
-    if (selectedCardIdx === cardIdx) { setSelectedCardIdx(null); return; }
+  // --- Phase 2: reorder (used by both tap and drag) ---
+  const reorderRun = useCallback((runIdx: number, fromIdx: number, toIdx: number) => {
+    if (runIdx !== currentRunIndex || runs[runIdx]?.sorted) return;
     const nr = [...runs]; const run = { ...nr[runIdx], cards: [...nr[runIdx].cards] };
-    const [m] = run.cards.splice(selectedCardIdx, 1); run.cards.splice(cardIdx, 0, m);
+    const [m] = run.cards.splice(fromIdx, 1); run.cards.splice(toIdx, 0, m);
     run.sorted = isRunSorted(run.cards); nr[runIdx] = run; setRuns(nr); setSelectedCardIdx(null);
     if (run.sorted) {
       setScore(p => p + 15); showMsg(`Run ${runIdx + 1} ordenado!`, 'success');
@@ -450,7 +449,22 @@ export default function TimSortGame() {
         else { setPhase('merge'); showMsg('Todos ordenados. Ahora fusionalos!', 'success'); resetMerge(); } }, 600);
       } else { setTimeout(() => setCurrentRunIndex(next), 400); }
     }
+  }, [runs, currentRunIndex]);
+
+  const handleInsertionTap = (runIdx: number, cardIdx: number) => {
+    if (runIdx !== currentRunIndex || runs[runIdx].sorted) return;
+    if (selectedCardIdx === null) { setSelectedCardIdx(cardIdx); return; }
+    if (selectedCardIdx === cardIdx) { setSelectedCardIdx(null); return; }
+    reorderRun(runIdx, selectedCardIdx, cardIdx);
   };
+
+  // Touch drag for the active run
+  const activeRunCards = runs[currentRunIndex]?.cards ?? [];
+  const dragHandlers = useTouchDrag(
+    activeRunCards.length,
+    (from, to) => reorderRun(currentRunIndex, from, to),
+    phase === 'insertion-sort' && !runs[currentRunIndex]?.sorted,
+  );
 
   // --- Phase 3 ---
   const resetMerge = () => { setMergePairIndex(0); setMergedResult([]); setMergeLeftPointer(0); setMergeRightPointer(0); };
@@ -598,7 +612,7 @@ export default function TimSortGame() {
               <div className="lg-panel lg-panel-sm p-4 mb-3">
                 <p className="text-[12px] font-semibold tracking-wide mb-0.5" style={{ color: '#8fa396' }}>PASO 2</p>
                 <p className="text-[16px] font-semibold" style={{ color: '#1a2e22' }}>Ordena cada run</p>
-                <p className="text-[13px] mt-1 leading-snug" style={{ color: '#6b7c72' }}>Toca una carta, luego toca la posicion destino.</p>
+                <p className="text-[13px] mt-1 leading-snug" style={{ color: '#6b7c72' }}>Arrastra las cartas o toca para mover.</p>
               </div>
 
               <CodePanel phaseKey="insertion-sort" />
@@ -618,14 +632,39 @@ export default function TimSortGame() {
                       <div className="flex gap-2 flex-wrap">
                         {run.cards.map((card, ci) => (
                           <NumberCardComponent key={card.id} card={card} color={run.sorted ? '#43b649' : run.color}
-                            selected={isActive && selectedCardIdx === ci} dimmed={!isActive && !run.sorted}
-                            onClick={() => handleInsertionTap(runIdx, ci)} />
+                            selected={isActive && !dragHandlers.state.dragging && selectedCardIdx === ci}
+                            dimmed={!isActive && !run.sorted}
+                            dragging={isActive && dragHandlers.state.dragIdx === ci}
+                            dropTarget={isActive && dragHandlers.state.dragging && dragHandlers.state.overIdx === ci && dragHandlers.state.dragIdx !== ci}
+                            onClick={() => {
+                              if (!dragHandlers.wasDrag()) handleInsertionTap(runIdx, ci);
+                            }}
+                            onTouchStart={isActive ? (e) => dragHandlers.handleTouchStart(ci, e) : undefined}
+                            onTouchMove={isActive ? dragHandlers.handleTouchMove : undefined}
+                            onTouchEnd={isActive ? dragHandlers.handleTouchEnd : undefined}
+                            registerRef={isActive ? (el) => dragHandlers.registerCard(ci, el) : undefined}
+                          />
                         ))}
                       </div>
                     </div>
                   );
                 })}
               </div>
+
+              {/* Ghost card floating under finger */}
+              {dragHandlers.state.dragging && dragHandlers.state.ghostPos && dragHandlers.state.dragIdx !== null && (
+                <div
+                  className="lg-ghost"
+                  style={{
+                    left: dragHandlers.state.ghostPos.x,
+                    top: dragHandlers.state.ghostPos.y,
+                    background: `linear-gradient(145deg, ${runs[currentRunIndex]?.color ?? '#026937'}ee, ${runs[currentRunIndex]?.color ?? '#026937'}aa)`,
+                    boxShadow: `0 16px 40px ${runs[currentRunIndex]?.color ?? '#026937'}55, 0 0 0 2px ${runs[currentRunIndex]?.color ?? '#026937'}44, 0 0.5px 0 rgba(255,255,255,0.5) inset`,
+                  }}
+                >
+                  <span>{activeRunCards[dragHandlers.state.dragIdx]?.value}</span>
+                </div>
+              )}
             </div>
           )}
 
