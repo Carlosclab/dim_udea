@@ -13,7 +13,7 @@ export default defineSchema({
     score: v.number(),
     mistakes: v.number(),
     timeMs: v.number(),
-    level: v.string(), // 'best' | 'average' | 'worst'
+    level: v.optional(v.string()), // 'best' | 'average' | 'worst'
     completedAt: v.number(),
   })
     .index("by_score", ["score"])

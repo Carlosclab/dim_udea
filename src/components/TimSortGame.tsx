@@ -465,7 +465,7 @@ export default function TimSortGame({ playerId, username, onShowLeaderboard, onL
     setRuns(newRuns); addScore(10);
     const first = newRuns.findIndex(r => !r.sorted);
     if (first === -1) {
-      setScore(p => p + 20);
+      addScore(20);
       if (newRuns.length === 1) { setPhase('victory'); showMsg('El array ya estaba ordenado!', 'success'); }
       else { setPhase('merge'); showMsg('Todos los runs ya estan ordenados. A fusionar!', 'success'); resetMerge(); }
     } else { setCurrentRunIndex(first); setSelectedCardIdx(null); setPhase('insertion-sort'); showMsg('Toca una carta y luego toca donde quieres moverla', 'info'); }
@@ -483,7 +483,7 @@ export default function TimSortGame({ playerId, username, onShowLeaderboard, onL
     const [m] = run.cards.splice(fromIdx, 1); run.cards.splice(toIdx, 0, m);
     run.sorted = isRunSorted(run.cards); nr[runIdx] = run; setRuns(nr); setSelectedCardIdx(null);
     if (run.sorted) {
-      setScore(p => p + 15); showMsg(`Run ${runIdx + 1} ordenado!`, 'success');
+      addScore(15); showMsg(`Run ${runIdx + 1} ordenado!`, 'success');
       const next = nr.findIndex((r, i) => i > runIdx && !r.sorted);
       if (next === -1) {
         setTimeout(() => { if (nr.length === 1) { setPhase('victory'); showMsg('Array ordenado!', 'success'); }
@@ -522,7 +522,7 @@ export default function TimSortGame({ playerId, username, onShowLeaderboard, onL
       if (side !== ok) { setMistakes(p => p + 1); showMsg(`Elige el menor: ${ok === 'left' ? lc.value : rc.value} < ${ok === 'left' ? rc.value : lc.value}`, 'error'); return; }
     }
     const sel = side === 'left' ? lc : rc;
-    const nm = [...mergedResult, sel]; setMergedResult(nm); setScore(p => p + 5);
+    const nm = [...mergedResult, sel]; setMergedResult(nm); addScore(5);
     const nLP = side === 'left' ? mergeLeftPointer + 1 : mergeLeftPointer;
     const nRP = side === 'right' ? mergeRightPointer + 1 : mergeRightPointer;
     if (side === 'left') setMergeLeftPointer(nLP); else setMergeRightPointer(nRP);
@@ -534,7 +534,7 @@ export default function TimSortGame({ playerId, username, onShowLeaderboard, onL
   const finishMerge = (merged: NumberCard[]) => {
     const i = mergePairIndex * 2; const nr = [...runs];
     nr.splice(i, 2, { id: `merged-${Date.now()}`, cards: merged, sorted: true, color: nr[i].color });
-    setRuns(nr); setScore(p => p + 20);
+    setRuns(nr); addScore(20);
     if (nr.length <= 1) { setTimeout(() => { setPhase('victory'); showMsg('Felicidades! TimSort completado!', 'success'); }, 400); }
     else { showMsg(`Merge completo! Quedan ${nr.length} runs.`, 'success'); setTimeout(resetMerge, 600); }
   };
@@ -597,11 +597,42 @@ export default function TimSortGame({ playerId, username, onShowLeaderboard, onL
             </div>
           </div>
 
-          <div className="lg-panel p-5 mb-8 lg-slide-up" style={{ animationDelay: '0.16s' }}>
+          {/* Level selector */}
+          <div className="lg-panel p-4 mb-4 lg-slide-up" style={{ animationDelay: '0.14s' }}>
+            <p className="text-[12px] font-semibold tracking-wide mb-3" style={{ color: '#8fa396' }}>NIVEL DE DIFICULTAD</p>
+            <div className="space-y-2">
+              {LEVELS.map((lv) => (
+                <button
+                  key={lv.key}
+                  onClick={() => initGame(lv.key)}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all text-left"
+                  style={{
+                    background: level === lv.key ? `${lv.color}12` : 'transparent',
+                    border: level === lv.key ? `1.5px solid ${lv.color}44` : '1.5px solid transparent',
+                  }}
+                >
+                  <span className="text-[22px]">{lv.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[15px] font-semibold" style={{ color: level === lv.key ? lv.color : '#1a2e22' }}>
+                      {lv.name}
+                    </p>
+                    <p className="text-[12px] leading-snug" style={{ color: '#6b7c72' }}>{lv.description}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-[13px] font-bold" style={{ color: lv.color }}>x{lv.scoreMultiplier}</p>
+                    <p className="text-[11px]" style={{ color: '#8fa396' }}>{lv.size} nums</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Array preview */}
+          <div className="lg-panel p-5 mb-5 lg-slide-up" style={{ animationDelay: '0.2s' }}>
             <p className="text-[12px] font-semibold tracking-wide mb-3" style={{ color: '#8fa396' }}>ARRAY A ORDENAR</p>
-            <div className="flex gap-2.5 justify-center flex-wrap">
+            <div className="flex gap-2 justify-center flex-wrap">
               {cards.map((card, i) => (
-                <NumberCardComponent key={card.id} card={card} color="#026937" animationDelay={i * 60 + 200} size="lg" />
+                <NumberCardComponent key={card.id} card={card} color={levelConfig.color} animationDelay={i * 50 + 100} size={level === 'worst' ? 'sm' : 'md'} />
               ))}
             </div>
           </div>
@@ -805,7 +836,7 @@ export default function TimSortGame({ playerId, username, onShowLeaderboard, onL
             </div>
           </div>
           <div className="w-full max-w-sm space-y-3">
-            <button onClick={initGame} className="lg-btn lg-btn-primary w-full">Jugar de nuevo</button>
+            <button onClick={resetGame} className="lg-btn lg-btn-primary w-full">Jugar de nuevo</button>
             <button onClick={onShowLeaderboard} className="lg-btn w-full" style={{ background: 'rgba(19,117,152,0.1)', color: '#137598', border: '0.5px solid rgba(19,117,152,0.2)' }}>
               Ver Ranking
             </button>

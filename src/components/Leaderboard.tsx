@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
+import { LEVELS, GameLevel } from '@/lib/timsort-engine';
 
 interface Props {
   currentUsername: string | null;
@@ -11,11 +13,16 @@ interface Props {
   onPlay: () => void;
 }
 
+const LEVEL_LABELS: Record<string, { emoji: string; name: string; color: string }> = {
+  best: { emoji: '🌱', name: 'Mejor', color: '#43b649' },
+  average: { emoji: '⚡', name: 'Promedio', color: '#f9a12c' },
+  worst: { emoji: '🔥', name: 'Peor', color: '#ef434d' },
+};
+
 function formatTime(ms: number): string {
   const s = Math.floor(ms / 1000);
   const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
 }
 
 function Medal({ rank }: { rank: number }) {
@@ -26,7 +33,9 @@ function Medal({ rank }: { rank: number }) {
 }
 
 export default function Leaderboard({ currentUsername, playerId, onClose, onPlay }: Props) {
-  const leaderboard = useQuery(api.games.getLeaderboard);
+  const [filter, setFilter] = useState<string | undefined>(undefined);
+
+  const leaderboard = useQuery(api.games.getLeaderboard, { level: filter });
   const myHistory = useQuery(api.games.getPlayerHistory, playerId ? { playerId } : "skip");
 
   return (
@@ -41,10 +50,39 @@ export default function Leaderboard({ currentUsername, playerId, onClose, onPlay
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-6">
+        {/* Level filter tabs */}
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+          <button
+            onClick={() => setFilter(undefined)}
+            className="lg-badge shrink-0 transition-all"
+            style={{
+              background: !filter ? 'rgba(2,105,55,0.12)' : 'rgba(255,255,255,0.4)',
+              color: !filter ? '#026937' : '#8fa396',
+              border: !filter ? '1px solid rgba(2,105,55,0.2)' : '0.5px solid rgba(255,255,255,0.3)',
+            }}
+          >
+            Todos
+          </button>
+          {LEVELS.map(lv => (
+            <button
+              key={lv.key}
+              onClick={() => setFilter(lv.key)}
+              className="lg-badge shrink-0 transition-all"
+              style={{
+                background: filter === lv.key ? `${lv.color}15` : 'rgba(255,255,255,0.4)',
+                color: filter === lv.key ? lv.color : '#8fa396',
+                border: filter === lv.key ? `1px solid ${lv.color}33` : '0.5px solid rgba(255,255,255,0.3)',
+              }}
+            >
+              {lv.emoji} {lv.name}
+            </button>
+          ))}
+        </div>
+
         {/* Global leaderboard */}
         <div className="lg-panel p-4 mb-4 lg-slide-up">
           <p className="text-[12px] font-semibold tracking-wide mb-3" style={{ color: '#8fa396' }}>
-            TOP GLOBAL
+            TOP GLOBAL {filter ? `— ${LEVEL_LABELS[filter]?.name}` : ''}
           </p>
 
           {!leaderboard ? (
@@ -59,6 +97,7 @@ export default function Leaderboard({ currentUsername, playerId, onClose, onPlay
             <div className="space-y-1">
               {leaderboard.map((entry, i) => {
                 const isMe = entry.username === currentUsername;
+                const lv = LEVEL_LABELS[entry.level ?? 'best'] ?? LEVEL_LABELS.best;
                 return (
                   <div
                     key={entry._id}
@@ -80,9 +119,9 @@ export default function Leaderboard({ currentUsername, playerId, onClose, onPlay
                         {entry.mistakes} error{entry.mistakes !== 1 ? 'es' : ''} · {formatTime(entry.timeMs)}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <p className="text-[17px] font-bold" style={{ color: '#026937' }}>{entry.score}</p>
-                      <p className="text-[11px]" style={{ color: '#8fa396' }}>pts</p>
+                      <p className="text-[11px]" style={{ color: lv.color }}>{lv.emoji} {lv.name}</p>
                     </div>
                   </div>
                 );
@@ -98,26 +137,29 @@ export default function Leaderboard({ currentUsername, playerId, onClose, onPlay
               TUS PARTIDAS
             </p>
             <div className="space-y-1">
-              {myHistory.map((g) => (
-                <div key={g._id} className="flex items-center gap-3 px-3 py-2 rounded-xl">
-                  <div className="flex-1">
-                    <p className="text-[14px] font-semibold" style={{ color: '#1a2e22' }}>
-                      {g.score} pts
-                    </p>
-                    <p className="text-[12px]" style={{ color: '#8fa396' }}>
-                      {g.mistakes} error{g.mistakes !== 1 ? 'es' : ''} · {formatTime(g.timeMs)}
+              {myHistory.map((g) => {
+                const lv = LEVEL_LABELS[g.level ?? 'best'] ?? LEVEL_LABELS.best;
+                return (
+                  <div key={g._id} className="flex items-center gap-3 px-3 py-2 rounded-xl">
+                    <div className="flex-1">
+                      <p className="text-[14px] font-semibold" style={{ color: '#1a2e22' }}>
+                        {g.score} pts
+                        <span className="text-[11px] ml-1.5" style={{ color: lv.color }}>{lv.emoji}</span>
+                      </p>
+                      <p className="text-[12px]" style={{ color: '#8fa396' }}>
+                        {g.mistakes} error{g.mistakes !== 1 ? 'es' : ''} · {formatTime(g.timeMs)}
+                      </p>
+                    </div>
+                    <p className="text-[11px]" style={{ color: '#b0c4b8' }}>
+                      {new Date(g.completedAt).toLocaleDateString('es')}
                     </p>
                   </div>
-                  <p className="text-[11px]" style={{ color: '#b0c4b8' }}>
-                    {new Date(g.completedAt).toLocaleDateString('es')}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* Play button */}
         <button onClick={onPlay} className="lg-btn lg-btn-primary w-full text-[17px] mt-2">
           Jugar
         </button>
