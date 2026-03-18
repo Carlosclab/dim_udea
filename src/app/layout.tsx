@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import ConvexClientProvider from "@/components/ConvexClientProvider";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -34,7 +35,9 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/favicon.ico" />
       </head>
       <body className="antialiased">
-        {children}
+        <ConvexClientProvider>
+          {children}
+        </ConvexClientProvider>
       </body>
     </html>
   );

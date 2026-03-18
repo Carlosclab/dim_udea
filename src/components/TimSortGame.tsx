@@ -1,6 +1,9 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useMutation } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+import { Id } from '../../convex/_generated/dataModel';
 import {
   GamePhase,
   NumberCard,
@@ -380,7 +383,14 @@ function Confetti() {
 // ============================================================
 // Main Game
 // ============================================================
-export default function TimSortGame() {
+interface GameProps {
+  playerId: Id<"players">;
+  username: string;
+  onShowLeaderboard: () => void;
+  onLogout: () => void;
+}
+
+export default function TimSortGame({ playerId, username, onShowLeaderboard, onLogout }: GameProps) {
   const [phase, setPhase] = useState<GamePhase>('intro');
   const [showTutorial, setShowTutorial] = useState(false);
   const [cards, setCards] = useState<NumberCard[]>([]);
@@ -389,6 +399,7 @@ export default function TimSortGame() {
   const [mistakes, setMistakes] = useState(0);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'info' | 'success' | 'error' | 'warning'>('info');
+  const [saved, setSaved] = useState(false);
 
   const [splitMarkers, setSplitMarkers] = useState<Set<number>>(new Set());
   const [currentRunIndex, setCurrentRunIndex] = useState(0);
@@ -398,19 +409,34 @@ export default function TimSortGame() {
   const [mergeLeftPointer, setMergeLeftPointer] = useState(0);
   const [mergeRightPointer, setMergeRightPointer] = useState(0);
 
+  // Timer
+  const gameStartTime = useRef<number>(0);
+  const saveResult = useMutation(api.games.saveResult);
+
   const showMsg = (msg: string, type: 'info' | 'success' | 'error' | 'warning') => { setMessage(msg); setMessageType(type); };
 
   const initGame = useCallback(() => {
     setCards(createCards(generateArray(8)));
     setPhase('intro');
     setShowTutorial(false);
+    setSaved(false);
     setRuns([]); setScore(0); setMistakes(0);
     setSplitMarkers(new Set()); setCurrentRunIndex(0); setSelectedCardIdx(null);
     setMergePairIndex(0); setMergedResult([]); setMergeLeftPointer(0); setMergeRightPointer(0);
     setMessage('');
+    gameStartTime.current = 0;
   }, []);
 
   useEffect(() => { initGame(); }, [initGame]);
+
+  // Save score to Convex when victory is reached
+  useEffect(() => {
+    if (phase === 'victory' && !saved && gameStartTime.current > 0) {
+      setSaved(true);
+      const timeMs = Date.now() - gameStartTime.current;
+      saveResult({ playerId, username, score, mistakes, timeMs }).catch(() => {});
+    }
+  }, [phase, saved, playerId, username, score, mistakes, saveResult]);
 
   // --- Phase 1 ---
   const toggleSplit = (i: number) => { const n = new Set(splitMarkers); n.has(i) ? n.delete(i) : n.add(i); setSplitMarkers(n); };
@@ -502,10 +528,26 @@ export default function TimSortGame() {
   return (
     <div className="lg-background min-h-[100dvh] flex flex-col safe-area-top safe-area-bottom">
 
+      {/* User bar (visible in intro & game phases) */}
+      {!showTutorial && phase !== 'victory' && (
+        <div className="flex items-center justify-between px-5 pt-4 pb-1">
+          <button onClick={onLogout} className="text-[13px] font-medium" style={{ color: '#8fa396' }}>
+            Salir
+          </button>
+          <p className="text-[13px] font-semibold" style={{ color: '#026937' }}>
+            {username}
+          </p>
+          <button onClick={onShowLeaderboard} className="text-[13px] font-semibold" style={{ color: '#137598' }}>
+            Ranking
+          </button>
+        </div>
+      )}
+
       {/* TUTORIAL */}
       {showTutorial && (
         <Tutorial onFinish={() => {
           setShowTutorial(false);
+          gameStartTime.current = Date.now();
           setPhase('identify-runs');
           showMsg('Toca los espacios entre cartas para dividir en runs', 'info');
         }} />
@@ -558,7 +600,7 @@ export default function TimSortGame() {
               Tutorial
             </button>
             <button
-              onClick={() => { setPhase('identify-runs'); showMsg('Toca los espacios entre cartas para dividir en runs', 'info'); }}
+              onClick={() => { gameStartTime.current = Date.now(); setPhase('identify-runs'); showMsg('Toca los espacios entre cartas para dividir en runs', 'info'); }}
               className="lg-btn lg-btn-primary w-full text-[17px]"
             >
               Comenzar
@@ -747,7 +789,12 @@ export default function TimSortGame() {
               {(runs.length > 0 ? runs[0].cards : cards).map((c, i) => <NumberCardComponent key={c.id} card={c} color="#43b649" animationDelay={i * 80} size="sm" />)}
             </div>
           </div>
-          <button onClick={initGame} className="lg-btn lg-btn-primary w-full max-w-sm">Jugar de nuevo</button>
+          <div className="w-full max-w-sm space-y-3">
+            <button onClick={initGame} className="lg-btn lg-btn-primary w-full">Jugar de nuevo</button>
+            <button onClick={onShowLeaderboard} className="lg-btn w-full" style={{ background: 'rgba(19,117,152,0.1)', color: '#137598', border: '0.5px solid rgba(19,117,152,0.2)' }}>
+              Ver Ranking
+            </button>
+          </div>
           <p className="text-[11px] mt-6 text-center" style={{ color: '#b0c4b8' }}>TimSort: O(n log n) peor caso · O(n) mejor caso</p>
         </div>
       )}
