@@ -3,6 +3,51 @@
 
 export type GamePhase = 'intro' | 'identify-runs' | 'insertion-sort' | 'merge' | 'victory';
 
+// ============================================================
+// Levels — based on TimSort's complexity scenarios
+// ============================================================
+export type GameLevel = 'best' | 'average' | 'worst';
+
+export interface LevelConfig {
+  key: GameLevel;
+  name: string;
+  description: string;
+  emoji: string;
+  size: number;         // array length
+  scoreMultiplier: number;
+  color: string;        // UdeA color
+}
+
+export const LEVELS: LevelConfig[] = [
+  {
+    key: 'best',
+    name: 'Mejor caso',
+    description: 'Array casi ordenado — O(n). Pocas correcciones necesarias.',
+    emoji: '🌱',
+    size: 8,
+    scoreMultiplier: 1,
+    color: '#43b649',
+  },
+  {
+    key: 'average',
+    name: 'Caso promedio',
+    description: 'Mezcla de runs cortos y desorden — O(n log n).',
+    emoji: '⚡',
+    size: 10,
+    scoreMultiplier: 1.5,
+    color: '#f9a12c',
+  },
+  {
+    key: 'worst',
+    name: 'Peor caso',
+    description: 'Array completamente desordenado — O(n log n) maximo.',
+    emoji: '🔥',
+    size: 12,
+    scoreMultiplier: 2,
+    color: '#ef434d',
+  },
+];
+
 export interface NumberCard {
   id: string;
   value: number;
@@ -52,6 +97,77 @@ export function generateArray(size: number = 8): number[] {
     }
   }
   return arr;
+}
+
+/**
+ * Best case: Nearly sorted array.
+ * Long natural ascending runs with 1-2 small inversions.
+ * TimSort handles this in O(n).
+ */
+function generateBestCase(size: number): number[] {
+  // Start with a sorted array, then swap 1-2 adjacent pairs
+  const arr = generateArray(size).sort((a, b) => a - b);
+  // Swap 1 pair near the middle to create 2 natural runs
+  const mid = Math.floor(size / 2);
+  [arr[mid], arr[mid - 1]] = [arr[mid - 1], arr[mid]];
+  return arr;
+}
+
+/**
+ * Average case: Mix of short ascending runs and random segments.
+ * Some natural order, some chaos.
+ */
+function generateAverageCase(size: number): number[] {
+  const pool = generateArray(size);
+  const result: number[] = [];
+  let i = 0;
+
+  while (i < pool.length) {
+    // Alternating: sorted chunk (2-3) then random chunk (1-2)
+    const runLen = Math.min(2 + Math.floor(Math.random() * 2), pool.length - i);
+    const chunk = pool.slice(i, i + runLen);
+
+    if (Math.random() > 0.4) {
+      // Sorted run
+      chunk.sort((a, b) => a - b);
+    }
+    // else leave random
+
+    result.push(...chunk);
+    i += runLen;
+  }
+  return result;
+}
+
+/**
+ * Worst case: Fully random or zigzag — no natural ascending runs > 1.
+ * Forces maximum splits and work.
+ */
+function generateWorstCase(size: number): number[] {
+  const sorted = generateArray(size).sort((a, b) => a - b);
+  // Zigzag: alternate picking from start and end
+  const result: number[] = [];
+  let lo = 0, hi = sorted.length - 1;
+  let fromHi = true;
+  while (lo <= hi) {
+    if (fromHi) {
+      result.push(sorted[hi--]);
+    } else {
+      result.push(sorted[lo++]);
+    }
+    fromHi = !fromHi;
+  }
+  return result;
+}
+
+/** Generate array based on level */
+export function generateArrayForLevel(level: GameLevel): number[] {
+  const config = LEVELS.find(l => l.key === level)!;
+  switch (level) {
+    case 'best': return generateBestCase(config.size);
+    case 'average': return generateAverageCase(config.size);
+    case 'worst': return generateWorstCase(config.size);
+  }
 }
 
 export function createCards(arr: number[]): NumberCard[] {

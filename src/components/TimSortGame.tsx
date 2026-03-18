@@ -6,10 +6,12 @@ import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import {
   GamePhase,
+  GameLevel,
+  LEVELS,
   NumberCard,
   Run,
   createCards,
-  generateArray,
+  generateArrayForLevel,
   isRunSorted,
   createRunsFromSplits,
 } from '@/lib/timsort-engine';
@@ -392,6 +394,7 @@ interface GameProps {
 
 export default function TimSortGame({ playerId, username, onShowLeaderboard, onLogout }: GameProps) {
   const [phase, setPhase] = useState<GamePhase>('intro');
+  const [level, setLevel] = useState<GameLevel>('best');
   const [showTutorial, setShowTutorial] = useState(false);
   const [cards, setCards] = useState<NumberCard[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
@@ -409,14 +412,23 @@ export default function TimSortGame({ playerId, username, onShowLeaderboard, onL
   const [mergeLeftPointer, setMergeLeftPointer] = useState(0);
   const [mergeRightPointer, setMergeRightPointer] = useState(0);
 
+  const levelConfig = LEVELS.find(l => l.key === level)!;
+
   // Timer
   const gameStartTime = useRef<number>(0);
   const saveResult = useMutation(api.games.saveResult);
 
   const showMsg = (msg: string, type: 'info' | 'success' | 'error' | 'warning') => { setMessage(msg); setMessageType(type); };
 
-  const initGame = useCallback(() => {
-    setCards(createCards(generateArray(8)));
+  // Score with multiplier
+  const addScore = (base: number) => {
+    setScore(prev => prev + Math.round(base * levelConfig.scoreMultiplier));
+  };
+
+  const initGame = useCallback((lvl?: GameLevel) => {
+    const selectedLevel = lvl ?? level;
+    if (lvl) setLevel(lvl);
+    setCards(createCards(generateArrayForLevel(selectedLevel)));
     setPhase('intro');
     setShowTutorial(false);
     setSaved(false);
@@ -425,18 +437,21 @@ export default function TimSortGame({ playerId, username, onShowLeaderboard, onL
     setMergePairIndex(0); setMergedResult([]); setMergeLeftPointer(0); setMergeRightPointer(0);
     setMessage('');
     gameStartTime.current = 0;
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [level]);
 
-  useEffect(() => { initGame(); }, [initGame]);
+  const resetGame = useCallback(() => initGame(), [initGame]);
+
+  useEffect(() => { initGame(); }, []);
 
   // Save score to Convex when victory is reached
   useEffect(() => {
     if (phase === 'victory' && !saved && gameStartTime.current > 0) {
       setSaved(true);
       const timeMs = Date.now() - gameStartTime.current;
-      saveResult({ playerId, username, score, mistakes, timeMs }).catch(() => {});
+      saveResult({ playerId, username, score, mistakes, timeMs, level }).catch(() => {});
     }
-  }, [phase, saved, playerId, username, score, mistakes, saveResult]);
+  }, [phase, saved, playerId, username, score, mistakes, level, saveResult]);
 
   // --- Phase 1 ---
   const toggleSplit = (i: number) => { const n = new Set(splitMarkers); n.has(i) ? n.delete(i) : n.add(i); setSplitMarkers(n); };
@@ -447,7 +462,7 @@ export default function TimSortGame({ playerId, username, onShowLeaderboard, onL
     if (newRuns.some(r => r.cards.length > 5)) { showMsg('Maximo 5 elementos por run. Divide mas.', 'warning'); return; }
     if (newRuns.filter(r => r.cards.length < 2).length > 1) { showMsg('Cada run debe tener al menos 2 elementos.', 'warning'); return; }
     newRuns.forEach((r, i) => { r.color = RUN_COLORS[i % RUN_COLORS.length]; });
-    setRuns(newRuns); setScore(p => p + 10);
+    setRuns(newRuns); addScore(10);
     const first = newRuns.findIndex(r => !r.sorted);
     if (first === -1) {
       setScore(p => p + 20);

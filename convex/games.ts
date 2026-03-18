@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-// Save a completed game result
 export const saveResult = mutation({
   args: {
     playerId: v.id("players"),
@@ -9,6 +8,7 @@ export const saveResult = mutation({
     score: v.number(),
     mistakes: v.number(),
     timeMs: v.number(),
+    level: v.string(),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("gameResults", {
@@ -17,22 +17,31 @@ export const saveResult = mutation({
       score: args.score,
       mistakes: args.mistakes,
       timeMs: args.timeMs,
+      level: args.level,
       completedAt: Date.now(),
     });
   },
 });
 
-// Global leaderboard — top 20 by score (desc), then by fewer mistakes, then faster time
+// Global leaderboard — top 20, best per player
 export const getLeaderboard = query({
-  args: {},
-  handler: async (ctx) => {
-    const results = await ctx.db
-      .query("gameResults")
-      .withIndex("by_score")
-      .order("desc")
-      .take(100);
+  args: { level: v.optional(v.string()) },
+  handler: async (ctx, { level }) => {
+    let results;
+    if (level) {
+      results = await ctx.db
+        .query("gameResults")
+        .withIndex("by_level", (q) => q.eq("level", level))
+        .order("desc")
+        .take(100);
+    } else {
+      results = await ctx.db
+        .query("gameResults")
+        .withIndex("by_score")
+        .order("desc")
+        .take(100);
+    }
 
-    // Group by player: keep only each player's best score
     const bestByPlayer = new Map<string, typeof results[0]>();
     for (const r of results) {
       const existing = bestByPlayer.get(r.username);
@@ -56,7 +65,6 @@ export const getLeaderboard = query({
   },
 });
 
-// Player's personal history
 export const getPlayerHistory = query({
   args: { playerId: v.id("players") },
   handler: async (ctx, { playerId }) => {
