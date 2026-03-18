@@ -31,77 +31,52 @@ const RUN_COLORS = [
 ];
 
 // ============================================================
-// Code snippets (Java) for each phase
+// Code snippets (Swift) for each phase
 // ============================================================
-const CODE_SNIPPETS: Record<string, { title: string; lang: string; code: string }> = {
+const CODE_SNIPPETS: Record<string, { title: string; code: string }> = {
   'identify-runs': {
-    title: 'Identificar Runs — Java',
-    lang: 'java',
-    code: `<span class="cm">// TimSort divide el array en "runs"</span>
-<span class="cm">// Un run es una subsecuencia ya ordenada</span>
-
-<span class="kw">static</span> <span class="tp">int</span> <span class="fn">countRunAndMakeAscending</span>(<span class="tp">int</span>[] a, <span class="tp">int</span> lo, <span class="tp">int</span> hi) {
-    <span class="tp">int</span> runHi = lo + <span class="nu">1</span>;
-    <span class="kw">if</span> (runHi == hi) <span class="kw">return</span> <span class="nu">1</span>;
-
-    <span class="cm">// Detectar si es ascendente o descendente</span>
-    <span class="kw">if</span> (a[runHi] < a[lo]) {
-        <span class="cm">// Descendente: avanzar mientras baje</span>
-        <span class="kw">while</span> (runHi < hi && a[runHi] < a[runHi - <span class="nu">1</span>])
-            runHi++;
-        <span class="fn">reverseRange</span>(a, lo, runHi); <span class="cm">// invertir</span>
+    title: 'Identificar Runs — Swift',
+    code: `<span class="kw">func</span> <span class="fn">findRuns</span>(<span class="kw">_</span> a: [<span class="tp">Int</span>]) -> [[<span class="tp">Int</span>]] {
+  <span class="kw">var</span> runs: [[<span class="tp">Int</span>]] = []
+  <span class="kw">var</span> run = [a[<span class="nu">0</span>]]
+  <span class="kw">for</span> i <span class="kw">in</span> <span class="nu">1</span>..&lt;a.count {
+    <span class="kw">if</span> a[i] >= run.last! {
+      run.<span class="fn">append</span>(a[i]) <span class="cm">// sigue subiendo</span>
     } <span class="kw">else</span> {
-        <span class="cm">// Ascendente: avanzar mientras suba</span>
-        <span class="kw">while</span> (runHi < hi && a[runHi] >= a[runHi - <span class="nu">1</span>])
-            runHi++;
+      runs.<span class="fn">append</span>(run)  <span class="cm">// cortar aqui</span>
+      run = [a[i]]
     }
-    <span class="kw">return</span> runHi - lo;
+  }
+  <span class="kw">return</span> runs + [run]
 }`,
   },
   'insertion-sort': {
-    title: 'Insertion Sort — Java',
-    lang: 'java',
-    code: `<span class="cm">// Insertion Sort para runs pequenos</span>
-<span class="cm">// Eficiente cuando el array es casi ordenado</span>
-
-<span class="kw">static</span> <span class="tp">void</span> <span class="fn">insertionSort</span>(<span class="tp">int</span>[] a, <span class="tp">int</span> lo, <span class="tp">int</span> hi) {
-    <span class="kw">for</span> (<span class="tp">int</span> i = lo + <span class="nu">1</span>; i < hi; i++) {
-        <span class="tp">int</span> key = a[i];
-        <span class="tp">int</span> j = i - <span class="nu">1</span>;
-
-        <span class="cm">// Mover elementos mayores a la derecha</span>
-        <span class="kw">while</span> (j >= lo && a[j] > key) {
-            a[j + <span class="nu">1</span>] = a[j];
-            j--;
-        }
-        a[j + <span class="nu">1</span>] = key;
+    title: 'Insertion Sort — Swift',
+    code: `<span class="kw">func</span> <span class="fn">insertionSort</span>(<span class="kw">_</span> a: <span class="kw">inout</span> [<span class="tp">Int</span>]) {
+  <span class="kw">for</span> i <span class="kw">in</span> <span class="nu">1</span>..&lt;a.count {
+    <span class="kw">let</span> key = a[i]
+    <span class="kw">var</span> j = i - <span class="nu">1</span>
+    <span class="kw">while</span> j >= <span class="nu">0</span> && a[j] > key {
+      a[j + <span class="nu">1</span>] = a[j] <span class="cm">// desplazar</span>
+      j -= <span class="nu">1</span>
     }
-}
-
-<span class="cm">// Complejidad: O(n²) peor caso</span>
-<span class="cm">// Pero O(n) si casi ordenado — ideal para runs</span>`,
+    a[j + <span class="nu">1</span>] = key
+  }
+} <span class="cm">// O(n) si casi ordenado</span>`,
   },
   merge: {
-    title: 'Merge de dos Runs — Java',
-    lang: 'java',
-    code: `<span class="cm">// Fusionar dos runs ordenados en uno solo</span>
-<span class="cm">// Siempre elegimos el menor de los dos frentes</span>
-
-<span class="kw">static</span> <span class="tp">void</span> <span class="fn">merge</span>(<span class="tp">int</span>[] a, <span class="tp">int</span> lo, <span class="tp">int</span> mid, <span class="tp">int</span> hi) {
-    <span class="tp">int</span>[] left  = <span class="fn">copyOfRange</span>(a, lo, mid);
-    <span class="tp">int</span>[] right = <span class="fn">copyOfRange</span>(a, mid, hi);
-
-    <span class="tp">int</span> i = <span class="nu">0</span>, j = <span class="nu">0</span>, k = lo;
-
-    <span class="kw">while</span> (i < left.length && j < right.length) {
-        <span class="kw">if</span> (left[i] <= right[j])
-            a[k++] = left[i++];  <span class="cm">// ← tomar del izquierdo</span>
-        <span class="kw">else</span>
-            a[k++] = right[j++]; <span class="cm">// ← tomar del derecho</span>
+    title: 'Merge — Swift',
+    code: `<span class="kw">func</span> <span class="fn">merge</span>(<span class="kw">_</span> left: [<span class="tp">Int</span>], <span class="kw">_</span> right: [<span class="tp">Int</span>]) -> [<span class="tp">Int</span>] {
+  <span class="kw">var</span> i = <span class="nu">0</span>, j = <span class="nu">0</span>, result: [<span class="tp">Int</span>] = []
+  <span class="kw">while</span> i < left.count && j < right.count {
+    <span class="kw">if</span> left[i] <= right[j] {
+      result.<span class="fn">append</span>(left[i]); i += <span class="nu">1</span>
+    } <span class="kw">else</span> {
+      result.<span class="fn">append</span>(right[j]); j += <span class="nu">1</span>
     }
-    <span class="cm">// Copiar restantes</span>
-    <span class="kw">while</span> (i < left.length) a[k++] = left[i++];
-    <span class="kw">while</span> (j < right.length) a[k++] = right[j++];
+  }
+  <span class="kw">return</span> result + <span class="tp">Array</span>(left[i...])
+                + <span class="tp">Array</span>(right[j...])
 }`,
   },
 };
